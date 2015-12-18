@@ -1,0 +1,198 @@
+enum { MAPSIZ = 24; }; enum { FALSE; TRUE; };
+struct { x, y } player_s;
+struct { x, y } dirvec_s;
+struct { x, y } cplane_s; // Camera plane
+
+static WORLDMAP[ MAPSIZ ][ MAPSIZ ] = {
+   
+   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,      
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1,
+   1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,3,0,0,0,3,0,0,0,1,
+   1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,0,0,0,0,0,2,2,0,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1,
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,1,
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,2,0,0,0,1,
+   1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,
+   1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,2,0,0,0,0,0,1,
+   1,4,0,4,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1,
+   1,4,0,0,0,0,5,0,0,0,0,0,0,0,0,3,0,0,0,3,0,0,0,1,
+   1,4,0,4,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,1,
+   1,4,0,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+
+};
+
+() {
+
+   static player_s player;
+   static dirvec_s dir;
+   static cplane_s plane;
+
+   player.x = 22; player.y = 12; // x and y start pos
+   dir.x = -1; dir.y = 0;        // initial direction vec
+   plane.x = 0; plane.y = 0.66;  // 2D raycaster v. of camera plane
+   
+   time = 0; oldtime = 0;
+   
+   while ( 1 ) {
+   
+      cls( 0 );
+   
+      for ( x = 0; x < xres; x++ ) {
+      
+         // Calc ray pos and dir
+         camerax = 2 * x / xres - 1; // x-coord in camera space
+         rayposx = player.x;
+         rayposy = player.y;
+         raydirx = dir.x + plane.x * camerax;
+         raydiry = dir.y + plane.y * camerax;
+         
+         // Which box of the map we are in
+         mapx = int( rayposx );
+         mapy = int( rayposy );
+         
+         // Length of ray from curr pos to next
+         sidedistx = 0; sidedisty = 0;
+         
+         // Length of ray from one x or y-side to next x or y-side
+         d_distx = sqrt( 1 + ( raydiry^2 ) / ( raydirx^2 ) );
+         d_disty = sqrt( 1 + ( raydirx^2 ) / ( raydiry^2 ) );
+         perpwalldist = 0;
+         
+         // What direction to step in x or y-direction (+1 or -1)
+         stepx = 0; stepy = 0;
+         
+         hit = 0; // Was there a wall hit?
+         side = 0; // Was a NS or EW wall hit?
+         
+         // Calculate step and initial sidedist
+         if ( raydirx < 0 ) {
+            stepx = -1;
+            sidedistx = ( rayposx - mapx ) * d_distx;
+         } else {
+            stepx = 1;
+            sidedistx = ( mapx + 1.0 - rayposx ) * d_distx;
+         }
+         
+         if ( raydiry < 0 ) {
+            stepy = -1;
+            sidedisty = ( rayposy - mapy ) * d_disty;
+         } else {
+            stepy = 1;
+            sidedisty = ( mapy + 1.0 - rayposy ) * d_disty;
+         }
+         
+         // Perform DDA
+         while ( hit == 0 ) {
+         
+            // Jump to next map square, OR in x-dir, OR in y-dir
+            if ( sidedistx < sidedisty ) {
+               sidedistx += d_distx;
+               mapx += stepx;
+               side = 0;
+            } else {
+               sidedisty += d_disty;
+               mapy += stepy;
+               side = 1;
+            }
+            
+            // Check if ray has hit a wall
+            if ( WORLDMAP[ mapx ][ mapy ] > 0 ) hit = 1;
+   
+         }
+         
+         // Calculate distance projected on camera direction
+         // (oblique distance will give fisheye effect)
+         if ( side == 0 ) {
+            perpwalldist = fabs( ( mapx - rayposx + ( 1 - stepx ) / 2 ) / raydirx );
+         } else {
+            perpwalldist = fabs( ( mapy - rayposy + ( 1 - stepy ) / 2 ) / raydiry );
+         }
+         
+         // Calculate height of line to draw on screen
+         lineheight = abs( int( yres / perpwalldist ) );
+         
+         // Calculate lowest and highest pixel to fill in current stripe
+         drawstart = -lineheight / 2 + yres / 2;
+         if ( drawstart < 0 ) drawstart = 0;
+         drawend = lineheight / 2 + yres / 2;
+         if ( drawend >= yres ) drawend = yres - 1;
+         
+         // Choose wall color
+         color = 0;
+         if      ( WORLDMAP[ mapx ][ mapy ] == 1 ) color = 0xff0000;
+         else if ( WORLDMAP[ mapx ][ mapy ] == 2 ) color = 0x00ff00;
+         else if ( WORLDMAP[ mapx ][ mapy ] == 3 ) color = 0x0000ff;
+         else if ( WORLDMAP[ mapx ][ mapy ] == 4 ) color = 0xffffff;
+         else                                      color = 0x00ffff;
+         
+         // Give x and y sides different brightness values
+         if ( side == 1 ) color /= 2;
+         
+         setcol( color );
+         
+         // Draw the pixels of the stripe as a vertical line
+         moveto( x, drawstart );
+         lineto( x, drawend );
+
+      }
+      
+      oldtime = time;
+      time = klock();
+      frametime = time - oldtime;
+      
+      setcol( 0xffffff );
+      moveto( xres - 120, 20 );
+      printnum( 1.0 / frametime );
+      moveto( xres - 45, 20 );
+      printf( "FPS" );
+      refresh();
+      //cls( 0 );
+      
+      // Speed modifiers
+      movespeed = frametime * 5.0;
+      rotspeed = frametime * 3.0;
+      
+      if ( keystatus[ 0xc8 ] ) {
+         if ( WORLDMAP[ int( player.x + dir.x * movespeed ) ][ int( player.y ) ] == false ) player.x += dir.x * movespeed;
+         if ( WORLDMAP[ int( player.x ) ][ int( player.y + dir.y * movespeed ) ] == false ) player.y += dir.y * movespeed;
+      }
+      
+      if ( keystatus[ 0xd0 ] ) {
+         if ( WORLDMAP[ int( player.x - dir.x * movespeed ) ][ int( player.y ) ] == false ) player.x -= dir.x * movespeed;
+         if ( WORLDMAP[ int( player.x ) ][ int( player.y - dir.y * movespeed ) ] == false ) player.y -= dir.y * movespeed;
+      }
+      
+      if ( keystatus[ 0xcd ] ) {
+         // Both camera direction and camera plane must be rotated
+         old_dirx = dir.x;
+         dir.x = dir.x * cos( -rotspeed ) - dir.y * sin( -rotspeed );
+         dir.y = old_dirx * sin( -rotspeed ) + dir.y * cos( -rotspeed );
+         old_planex = plane.x;
+         plane.x = plane.x * cos( -rotspeed ) - plane.y * sin( -rotspeed );
+         plane.y = old_planex * sin( -rotspeed ) + plane.y * cos( -rotspeed );
+      }
+      
+      if ( keystatus[ 0xcb ] ) {
+         // Both camera direction and camera plane must be rotated
+         old_dirx = dir.x;
+         dir.x = dir.x * cos( rotspeed ) - dir.y * sin( rotspeed );
+         dir.y = old_dirx * sin( rotspeed ) + dir.y * cos( rotspeed );
+         old_planex = plane.x;
+         plane.x = plane.x * cos( rotspeed ) - plane.y * sin( rotspeed );
+         plane.y = old_planex * sin( rotspeed ) + plane.y * cos( rotspeed );
+      }
+
+   }
+
+}
